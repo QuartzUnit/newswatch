@@ -1,0 +1,46 @@
+[build-system]
+requires = ["setuptools>=75.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "newswatch"
+version = "0.1.0"
+description = "News monitoring pipeline — collect, extract, search, and track changes across RSS feeds."
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.11"
+authors = [{ name = "QuartzUnit" }]
+keywords = ["news", "rss", "monitoring", "semantic-search", "change-tracking", "llm"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+]
+dependencies = [
+    "feedkit>=0.1.0",
+    "markgrab>=0.1.0",
+    "embgrep>=0.1.0",
+    "diffgrab>=0.1.0",
+    "click>=8.0",
+    "rich>=13.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0", "pytest-asyncio>=0.24", "ruff>=0.9"]
+
+[project.scripts]
+newswatch = "newswatch.__main__:main"
+
+[project.urls]
+Homepage = "https://github.com/QuartzUnit/newswatch"
+Repository = "https://github.com/QuartzUnit/newswatch"
+
+[tool.ruff]
+target-version = "py311"
+line-length = 120
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
