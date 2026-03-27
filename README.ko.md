@@ -4,10 +4,11 @@
 
 **뉴스 모니터링 파이프라인** — RSS 피드 수집, 전문 추출, 시맨틱 검색, 페이지 변경 추적. [QuartzUnit](https://github.com/QuartzUnit) 라이브러리로만 구축.
 
-```
-feedkit          markgrab         embgrep          diffgrab
-(수집)      →    (추출)      →   (검색)      →    (추적)
-444 RSS 피드     HTML→마크다운    시맨틱 인덱스    변경 감지
+```mermaid
+flowchart LR
+    A["🔗 feedkit\n444 RSS 피드"] -->|"기사 URL"| B["📄 markgrab\nHTML → 마크다운"]
+    B -->|"마크다운 파일"| C["🔍 embgrep\n시맨틱 인덱스"]
+    C -->|"추적 대상"| D["📊 diffgrab\n변경 감지"]
 ```
 
 ## 빠른 시작

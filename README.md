@@ -4,10 +4,11 @@
 
 **News monitoring pipeline** — collect RSS feeds, extract full articles, search by meaning, and track page changes. Built entirely from [QuartzUnit](https://github.com/QuartzUnit) libraries.
 
-```
-feedkit          markgrab         embgrep          diffgrab
-(collect)   →    (extract)   →   (search)    →    (track)
-444 RSS feeds    HTML→markdown    semantic index   change detection
+```mermaid
+flowchart LR
+    A["🔗 feedkit\n444 RSS feeds"] -->|"article URLs"| B["📄 markgrab\nHTML → markdown"]
+    B -->|"markdown files"| C["🔍 embgrep\nsemantic index"]
+    C -->|"tracked pages"| D["📊 diffgrab\nchange detection"]
 ```
 
 ## Quick Start
@@ -108,30 +109,16 @@ asyncio.run(main())
 
 ## How It Works
 
-```
-                    ┌──────────┐
-                    │ feedkit  │  Subscribe + collect RSS feeds
-                    │ (444     │  → SQLite: feeds.db
-                    │  feeds)  │
-                    └────┬─────┘
-                         │ article URLs
-                    ┌────▼─────┐
-                    │ markgrab │  Fetch full article → clean markdown
-                    │ (HTML    │  Auto-fallback: httpx → Playwright
-                    │  →MD)    │
-                    └────┬─────┘
-                         │ markdown files
-                    ┌────▼─────┐
-                    │ embgrep  │  Embed chunks → SQLite vector index
-                    │ (local   │  Smart chunking (heading-level)
-                    │  embed)  │  Search by meaning, not keywords
-                    └────┬─────┘
-                         │
-                    ┌────▼─────┐
-                    │ diffgrab │  Track specific pages for changes
-                    │ (change  │  Structured diffs + section analysis
-                    │  detect) │
-                    └──────────┘
+```mermaid
+flowchart TD
+    A["🔗 feedkit\n444 curated feeds"] -->|"article URLs"| B["📄 markgrab\nHTML → clean markdown\nhttpx → Playwright fallback"]
+    B -->|"markdown files"| C["🔍 embgrep\nEmbed chunks → SQLite vector index\nSmart chunking · heading-level"]
+    C -->|"indexed articles"| D["📊 diffgrab\nTrack pages for changes\nStructured diffs + section analysis"]
+
+    style A fill:#1a1a2e,stroke:#e94560,color:#fff
+    style B fill:#1a1a2e,stroke:#0f3460,color:#fff
+    style C fill:#1a1a2e,stroke:#533483,color:#fff
+    style D fill:#1a1a2e,stroke:#e94560,color:#fff
 ```
 
 ## Configuration
