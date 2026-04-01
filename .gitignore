@@ -8,5 +8,8 @@ venv/
 *.pyc
 .vscode/
 .idea/
+.env
+.env.*
+!.env.example
 CLAUDE.md
 PLAN.txt
