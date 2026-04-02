@@ -1,552 +1,78 @@
 # newswatch
-
-> News monitoring pipeline — collect, extract, search, and track changes across RSS feeds.
-
-## Purpose
-
-newswatch chains four QuartzUnit libraries (feedkit, markgrab, embgrep, diffgrab) into an end-to-end news monitoring pipeline. It subscribes to RSS/Atom feeds, extracts full article content as markdown, indexes articles for semantic search, and optionally tracks specific pages for content changes. Everything runs locally with no cloud services or API keys required.
-
-## Capabilities
-
-- **Feed subscription**: Subscribe to feeds from a built-in catalog of 444 curated feeds by category, or by custom URL (via feedkit)
-- **Article extraction**: Fetch and convert full article content to LLM-ready markdown with httpx and Playwright fallback (via markgrab)
-- **Semantic indexing**: Index extracted articles for natural language search using local embeddings and SQLite vector storage (via embgrep)
-- **Change tracking**: Monitor specific URLs for content changes over time with structured diffs and section analysis (via diffgrab)
-- **Full pipeline**: Single command runs collect, extract, index, and track in sequence
-- **Rich CLI output**: Formatted tables and colored terminal output via rich
-
-## Installation
-
+> RSS news monitoring pipeline — collect, extract, semantic search, change track. Runs locally, no API keys.
+## Install
 ```
-pip install newswatch
+pip install newswatch          # Python >=3.11
+pip install newswatch[dev]     # + pytest, ruff
 ```
-
-Required Python: >=3.11
-
-Dependencies: feedkit>=0.1.0, markgrab>=0.1.0, embgrep>=0.1.0, diffgrab>=0.1.0, click>=8.0, rich>=13.0
-
-Optional dev dependencies:
-
-```
-pip install newswatch[dev]
-```
-
-Installs: pytest>=8.0, pytest-asyncio>=0.24, ruff>=0.9
-
-## Quick Use
-
-### CLI
-
+Deps: feedkit, markgrab, embgrep, diffgrab, click, rich
+## CLI
 ```bash
-newswatch setup -c technology -c science         # subscribe to catalog feeds
-newswatch run                                     # full pipeline: collect + extract + index
-newswatch search "transformer architecture"       # semantic search across articles
-```
-
-### Python
-
-```python
-from newswatch.pipeline import NewsPipeline
-
-pipeline = NewsPipeline()
-await pipeline.setup(categories=["technology"])
-result = await pipeline.run(extract_limit=50)     # PipelineResult
-hits = pipeline.search("transformer architecture") # list[dict]
-pipeline.close()
-```
-
-## API Reference
-
-### Module: `newswatch`
-
-```python
-__version__: str  # "0.1.0"
-```
-
-### Class: `PipelineResult`
-
-```python
-@dataclass
-class PipelineResult:
-    """Result of a full pipeline run."""
-    feeds_collected: int = 0
-    articles_new: int = 0
-    articles_extracted: int = 0
-    articles_indexed: int = 0
-    changes_detected: int = 0
-    errors: list[str] = field(default_factory=list)
-```
-
-**Fields:**
-
-| Field | Type | Default | Description |
-|-------|------|---------|-------------|
-| `feeds_collected` | `int` | `0` | Number of feeds successfully polled |
-| `articles_new` | `int` | `0` | Number of new articles discovered |
-| `articles_extracted` | `int` | `0` | Number of articles whose full content was extracted |
-| `articles_indexed` | `int` | `0` | Number of articles added to the semantic index |
-| `changes_detected` | `int` | `0` | Number of tracked pages with detected changes |
-| `errors` | `list[str]` | `[]` | Error messages accumulated during the run |
-
-### Class: `NewsPipeline`
-
-End-to-end news monitoring pipeline. Chains feedkit (RSS/Atom collection), markgrab (content extraction), embgrep (semantic indexing), and diffgrab (change tracking).
-
-#### `__init__`
-
-```python
-def __init__(self, db_dir: str | Path | None = None) -> None
-```
-
-Create a new pipeline instance.
-
-**Parameters:**
-
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `db_dir` | `str \| Path \| None` | `None` | Directory for all database files. Defaults to `~/.newswatch/`. Created automatically if it does not exist. |
-
-**Attributes set:**
-
-| Attribute | Type | Description |
-|-----------|------|-------------|
-| `db_dir` | `Path` | Resolved database directory path |
-| `_store` | `FeedStore` | feedkit feed store backed by `feeds.db` |
-| `_index` | `EmbGrep` | embgrep semantic index backed by `index.db` |
-| `_tracker` | `DiffTracker` | diffgrab change tracker backed by `tracker.db` |
-
-#### `setup`
-
-```python
-async def setup(
-    self,
-    categories: list[str] | None = None,
-    feeds: list[str] | None = None,
-) -> int
-```
-
-Subscribe to feeds. Can be called multiple times to add more feeds.
-
-**Parameters:**
-
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `categories` | `list[str] \| None` | `None` | Catalog categories to subscribe (e.g., `["technology", "science"]`). Searches the built-in feedkit catalog. |
-| `feeds` | `list[str] \| None` | `None` | Individual feed URLs to subscribe directly. |
-
-**Returns:** `int` — Count of feeds subscribed in this call.
-
-#### `collect`
-
-```python
-async def collect(self, concurrency: int = 20) -> tuple[int, int]
-```
-
-Collect new articles from all subscribed feeds.
-
-**Parameters:**
-
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `concurrency` | `int` | `20` | Maximum number of feeds fetched in parallel. |
-
-**Returns:** `tuple[int, int]` — `(feeds_ok, new_articles)` where `feeds_ok` is the number of feeds successfully polled and `new_articles` is the number of newly discovered articles.
-
-#### `extract_and_index`
-
-```python
-async def extract_and_index(self, limit: int = 50) -> tuple[int, int]
-```
-
-Extract full article content from the latest collected articles and index them for semantic search. Articles are fetched with markgrab (max 10,000 chars, 15s timeout), filtered to those with >30 words, written as markdown files to the `extracted/` subdirectory, then batch-indexed by embgrep.
-
-**Parameters:**
-
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `limit` | `int` | `50` | Maximum number of articles to process per run. |
-
-**Returns:** `tuple[int, int]` — `(extracted, indexed)` where `extracted` is the number of articles whose content was successfully fetched and `indexed` is the number added to the search index (equal to `extracted` when indexing succeeds).
-
-#### `track_pages`
-
-```python
-async def track_pages(self, urls: list[str]) -> int
-```
-
-Track specific pages for content changes. Each URL is registered with diffgrab's tracker, then all tracked pages are checked for changes.
-
-**Parameters:**
-
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `urls` | `list[str]` | (required) | URLs to monitor for changes. |
-
-**Returns:** `int` — Number of tracked pages where a change was detected.
-
-#### `search`
-
-```python
-def search(self, query: str, top_k: int = 5) -> list[dict]
-```
-
-Semantic search across collected and indexed articles. This is a synchronous method (no await needed).
-
-**Parameters:**
-
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `query` | `str` | (required) | Natural language search query. |
-| `top_k` | `int` | `5` | Maximum number of results to return. |
-
-**Returns:** `list[dict]` — Each dict contains:
-
-| Key | Type | Description |
-|-----|------|-------------|
-| `"file"` | `str` | Path to the extracted markdown file |
-| `"score"` | `float` | Similarity score rounded to 4 decimal places |
-| `"text"` | `str` | First 200 characters of the matching chunk |
-| `"lines"` | `str` | Line range in the source file, e.g. `"1-15"` |
-
-#### `run`
-
-```python
-async def run(
-    self,
-    extract_limit: int = 50,
-    track_urls: list[str] | None = None,
-) -> PipelineResult
-```
-
-Run the full pipeline in sequence: collect, extract and index, then optionally track pages for changes. Each step is wrapped in error handling; failures are recorded in `PipelineResult.errors` without aborting the remaining steps.
-
-**Parameters:**
-
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `extract_limit` | `int` | `50` | Maximum number of articles to extract per run. Passed to `extract_and_index()`. |
-| `track_urls` | `list[str] \| None` | `None` | Optional URLs to monitor for changes. Skipped if `None`. |
-
-**Returns:** `PipelineResult` — Aggregated counts and any error messages from each step.
-
-#### `close`
-
-```python
-def close(self) -> None
-```
-
-Close all database connections (feed store, search index). Should be called when the pipeline is no longer needed.
-
-### CLI Commands
-
-Entry point: `newswatch` (maps to `newswatch.__main__:main`)
-
-#### `newswatch --version`
-
-Print the package version and exit.
-
-#### `newswatch setup`
-
-Subscribe to feeds from the built-in catalog or custom URLs.
-
-```
-Options:
-  -c, --category TEXT   Feed categories to subscribe (repeatable)
-  -f, --feed TEXT       Individual feed URLs to subscribe (repeatable)
-```
-
-#### `newswatch run`
-
-Run the full pipeline: collect, extract, index, and optionally track pages.
-
-```
-Options:
-  -n, --extract-limit INTEGER   Max articles to extract [default: 50]
-  -t, --track TEXT              URLs to monitor for changes (repeatable)
-```
-
-#### `newswatch search`
-
-Semantic search across collected articles.
-
-```
-Arguments:
-  QUERY                 Natural language search query (required)
-
-Options:
-  -n, --count INTEGER   Number of results [default: 5]
-```
-
-## Configuration
-
-### Data Directory
-
-All databases and extracted content are stored in `~/.newswatch/` by default:
-
-```
-~/.newswatch/
-  feeds.db       # feedkit subscriptions + collected articles (SQLite)
-  index.db       # embgrep semantic index (SQLite + embeddings)
-  tracker.db     # diffgrab page snapshots (SQLite)
-  extracted/     # markgrab markdown output files (article_0000.md, ...)
-```
-
-To use a custom location, pass `db_dir` to `NewsPipeline`:
-
-```python
-pipeline = NewsPipeline(db_dir="/path/to/data")
-```
-
-### Extraction Settings
-
-Articles are extracted with the following markgrab defaults (hardcoded in `extract_and_index`):
-
-| Setting | Value | Description |
-|---------|-------|-------------|
-| `max_chars` | `10000` | Maximum characters per extracted article |
-| `timeout` | `15.0` | HTTP timeout in seconds per article fetch |
-| Word count filter | `> 30` | Articles with 30 or fewer words are skipped |
-
-### Concurrency
-
-Feed collection defaults to 20 concurrent fetches. Override via the `concurrency` parameter on `collect()`:
-
-```python
-feeds_ok, new_articles = await pipeline.collect(concurrency=10)
-```
-
-### Dependency Libraries
-
-| Library | Role | Install | Source |
-|---------|------|---------|--------|
-| feedkit | RSS/Atom feed collection (444 curated feeds) | `pip install feedkit` | [github.com/QuartzUnit/feedkit](https://github.com/QuartzUnit/feedkit) |
-| markgrab | URL to LLM-ready markdown (httpx + Playwright fallback) | `pip install markgrab` | [github.com/QuartzUnit/markgrab](https://github.com/QuartzUnit/markgrab) |
-| embgrep | Local semantic search (fastembed + SQLite) | `pip install embgrep` | [github.com/QuartzUnit/embgrep](https://github.com/QuartzUnit/embgrep) |
-| diffgrab | Web page change tracking + structured diffs | `pip install diffgrab` | [github.com/QuartzUnit/diffgrab](https://github.com/QuartzUnit/diffgrab) |
-
-## Examples
-
-### Basic: Subscribe and run
-
-```python
-import asyncio
-from newswatch.pipeline import NewsPipeline
-
-async def basic():
-    pipeline = NewsPipeline()
-
-    # Subscribe to technology feeds from the built-in catalog
-    count = await pipeline.setup(categories=["technology"])
-    print(f"Subscribed to {count} feeds")
-
-    # Run the full pipeline
-    result = await pipeline.run()
-    print(f"Collected {result.feeds_collected} feeds")
-    print(f"Found {result.articles_new} new articles")
-    print(f"Extracted {result.articles_extracted} articles")
-    print(f"Indexed {result.articles_indexed} articles")
-
-    pipeline.close()
-
-asyncio.run(basic())
-```
-
-### Multiple categories with search
-
-```python
-import asyncio
-from newswatch.pipeline import NewsPipeline
-
-async def multi_category_search():
-    pipeline = NewsPipeline()
-
-    # Subscribe to multiple categories
-    await pipeline.setup(categories=["technology", "science", "finance"])
-
-    # Run with higher extraction limit
-    result = await pipeline.run(extract_limit=100)
-
-    # Search across all indexed articles
-    hits = pipeline.search("renewable energy investment trends", top_k=10)
-    for hit in hits:
-        print(f"[{hit['score']}] {hit['text']}")
-        print(f"  Source: {hit['file']} (lines {hit['lines']})")
-        print()
-
-    pipeline.close()
-
-asyncio.run(multi_category_search())
-```
-
-### Custom feed URLs
-
-```python
-import asyncio
-from newswatch.pipeline import NewsPipeline
-
-async def custom_feeds():
-    pipeline = NewsPipeline()
-
-    # Subscribe to specific feed URLs
-    await pipeline.setup(feeds=[
-        "https://hnrss.org/frontpage",
-        "https://feeds.arstechnica.com/arstechnica/features",
-        "https://www.theverge.com/rss/index.xml",
-    ])
-
-    result = await pipeline.run(extract_limit=30)
-    print(f"{result.articles_new} new articles, {result.articles_indexed} indexed")
-
-    pipeline.close()
-
-asyncio.run(custom_feeds())
-```
-
-### Change tracking
-
-```python
-import asyncio
-from newswatch.pipeline import NewsPipeline
-
-async def track_changes():
-    pipeline = NewsPipeline()
-
-    # Run pipeline with page change tracking
-    result = await pipeline.run(
-        extract_limit=50,
-        track_urls=[
-            "https://openai.com/blog",
-            "https://www.anthropic.com/research",
-            "https://huggingface.co/blog",
-        ],
-    )
-    print(f"Changes detected: {result.changes_detected}")
-
-    if result.errors:
-        for err in result.errors:
-            print(f"Error: {err}")
-
-    pipeline.close()
-
-asyncio.run(track_changes())
-```
-
-### Step-by-step pipeline control
-
-```python
-import asyncio
-from newswatch.pipeline import NewsPipeline
-
-async def step_by_step():
-    pipeline = NewsPipeline()
-
-    await pipeline.setup(categories=["technology"])
-
-    # Step 1: Collect only
-    feeds_ok, new_articles = await pipeline.collect(concurrency=10)
-    print(f"Collected: {feeds_ok} feeds, {new_articles} new articles")
-
-    # Step 2: Extract and index separately
-    extracted, indexed = await pipeline.extract_and_index(limit=25)
-    print(f"Extracted: {extracted}, Indexed: {indexed}")
-
-    # Step 3: Track pages independently
-    changes = await pipeline.track_pages([
-        "https://news.ycombinator.com",
-    ])
-    print(f"Changes: {changes}")
-
-    # Step 4: Search
-    hits = pipeline.search("large language models", top_k=3)
-    for hit in hits:
-        print(f"  [{hit['score']}] {hit['text'][:80]}")
-
-    pipeline.close()
-
-asyncio.run(step_by_step())
-```
-
-### Custom data directory
-
-```python
-import asyncio
-from pathlib import Path
-from newswatch.pipeline import NewsPipeline
-
-async def custom_dir():
-    # Store all data in a project-specific directory
-    pipeline = NewsPipeline(db_dir=Path("/tmp/my-newswatch-project"))
-
-    await pipeline.setup(categories=["science"])
-    result = await pipeline.run()
-    print(f"Data stored in: {pipeline.db_dir}")
-    print(f"Indexed: {result.articles_indexed} articles")
-
-    pipeline.close()
-
-asyncio.run(custom_dir())
-```
-
-### Error handling
-
-```python
-import asyncio
-from newswatch.pipeline import NewsPipeline
-
-async def with_error_handling():
-    pipeline = NewsPipeline()
-
-    await pipeline.setup(categories=["technology"])
-    result = await pipeline.run(extract_limit=50)
-
-    # Each pipeline step catches its own errors
-    if result.errors:
-        print(f"{len(result.errors)} error(s) during pipeline run:")
-        for err in result.errors:
-            print(f"  - {err}")
-    else:
-        print("Pipeline completed without errors")
-
-    print(f"Result: {result.feeds_collected} feeds, "
-          f"{result.articles_new} new, "
-          f"{result.articles_extracted} extracted, "
-          f"{result.articles_indexed} indexed")
-
-    pipeline.close()
-
-asyncio.run(with_error_handling())
-```
-
-### CLI examples
-
-```bash
-# Subscribe to feeds
-newswatch setup -c technology                        # single category
-newswatch setup -c technology -c science -c finance  # multiple categories
-newswatch setup -f https://hnrss.org/frontpage       # single feed URL
-newswatch setup -c technology -f https://my.blog/rss # mix both
-
-# Run pipeline
-newswatch run                                        # default: extract 50 articles
-newswatch run -n 100                                 # extract up to 100
-newswatch run -t https://openai.com/blog             # track a page for changes
-newswatch run -n 200 -t https://a.com -t https://b.com  # multiple tracked URLs
-
-# Search
-newswatch search "machine learning"                  # default 5 results
-newswatch search "kubernetes deployment" -n 10       # 10 results
-newswatch search "supply chain security"             # natural language query
-
-# Version
+newswatch setup -c technology -c science    # subscribe catalog feeds (-f URL for custom)
+newswatch run -n 100 -t https://a.com       # full pipeline, track pages
+newswatch search "transformer architecture" -n 10
 newswatch --version
 ```
-
+## API
+### PipelineResult (dataclass)
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `feeds_collected` | `int` | `0` | Feeds polled |
+| `articles_new` | `int` | `0` | New articles found |
+| `articles_extracted` | `int` | `0` | Articles content-extracted |
+| `articles_indexed` | `int` | `0` | Articles added to index |
+| `changes_detected` | `int` | `0` | Tracked pages with changes |
+| `errors` | `list[str]` | `[]` | Accumulated errors |
+### NewsPipeline
+`__init__(db_dir: str | Path | None = None)` — Create pipeline. Default dir: `~/.newswatch/`.
+`async setup(categories: list[str] | None = None, feeds: list[str] | None = None) -> int` — Subscribe feeds. Returns count added.
+`async collect(concurrency: int = 20) -> tuple[int, int]` — Poll feeds. Returns (feeds_ok, new_articles).
+`async extract_and_index(limit: int = 50) -> tuple[int, int]` — Fetch content via markgrab (max 10k chars, 15s timeout, >30 words filter), index via embgrep. Returns (extracted, indexed).
+`async track_pages(urls: list[str]) -> int` — Monitor URLs for changes via diffgrab. Returns changes count.
+`search(query: str, top_k: int = 5) -> list[dict]` — Sync semantic search. Returns dicts with keys: file (str), score (float), text (str, first 200 chars), lines (str).
+`async run(extract_limit: int = 50, track_urls: list[str] | None = None) -> PipelineResult` — Full pipeline: collect + extract + index + track. Errors captured, not raised.
+`close() -> None` — Close all DB connections.
+## Data directory
+```
+~/.newswatch/
+  feeds.db        # feedkit subscriptions (SQLite)
+  index.db        # embgrep semantic index (SQLite)
+  tracker.db      # diffgrab snapshots (SQLite)
+  extracted/      # markgrab markdown files
+```
+Override: `NewsPipeline(db_dir="/path/to/data")`
+## Examples
+### Subscribe + run + search
+```python
+import asyncio
+from newswatch.pipeline import NewsPipeline
+async def main():
+    p = NewsPipeline()
+    await p.setup(categories=["technology", "science"])
+    result = await p.run(extract_limit=100)
+    for hit in p.search("renewable energy", top_k=10):
+        print(f"[{hit['score']}] {hit['text']}")
+    p.close()
+asyncio.run(main())
+```
+### Step-by-step control
+```python
+async def steps():
+    p = NewsPipeline()
+    await p.setup(feeds=["https://hnrss.org/frontpage"])
+    feeds_ok, new = await p.collect(concurrency=10)
+    extracted, indexed = await p.extract_and_index(limit=25)
+    changes = await p.track_pages(["https://news.ycombinator.com"])
+    hits = p.search("large language models", top_k=3)
+    p.close()
+```
+### Error handling
+```python
+result = await pipeline.run()
+if result.errors:
+    for err in result.errors:
+        print(f"Error: {err}")
+print(f"{result.feeds_collected} feeds, {result.articles_indexed} indexed")
+```
 ## Links
-
-- Docs: https://github.com/QuartzUnit/newswatch
-- PyPI: https://pypi.org/project/newswatch/
-- Source: https://github.com/QuartzUnit/newswatch
-- feedkit: https://github.com/QuartzUnit/feedkit
-- markgrab: https://github.com/QuartzUnit/markgrab
-- embgrep: https://github.com/QuartzUnit/embgrep
-- diffgrab: https://github.com/QuartzUnit/diffgrab
+[Source](https://github.com/QuartzUnit/newswatch) | [PyPI](https://pypi.org/project/newswatch/) | [feedkit](https://github.com/QuartzUnit/feedkit) | [markgrab](https://github.com/QuartzUnit/markgrab) | [embgrep](https://github.com/QuartzUnit/embgrep) | [diffgrab](https://github.com/QuartzUnit/diffgrab)

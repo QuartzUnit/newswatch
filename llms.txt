@@ -1,51 +1,20 @@
 # newswatch
-
-> News monitoring pipeline — collect, extract, search, and track changes across RSS feeds.
-
-## Purpose
-
-newswatch chains four QuartzUnit libraries (feedkit, markgrab, embgrep, diffgrab) into an end-to-end news monitoring pipeline. It subscribes to RSS/Atom feeds, extracts full article content as markdown, indexes articles for semantic search, and optionally tracks specific pages for content changes.
-
-## Capabilities
-
-- **Feed subscription**: Subscribe to feeds from a built-in catalog by category or by custom URL (via feedkit)
-- **Article extraction**: Fetch and convert full article content to markdown (via markgrab)
-- **Semantic indexing**: Index extracted articles for natural language search (via embgrep)
-- **Change tracking**: Monitor specific URLs for content changes over time (via diffgrab)
-- **Full pipeline**: Single command runs collect, extract, index, and track in sequence
-
-## Installation
-
+> RSS news monitoring pipeline — collect, extract, semantic search, change track.
 ```
 pip install newswatch
 ```
-
-Dependencies: feedkit, markgrab, embgrep, diffgrab, click, rich
-
-## Quick Use
-
-### CLI
-
-```bash
-newswatch setup -c technology -c science         # subscribe to catalog feeds
-newswatch run                                     # full pipeline: collect + extract + index
-newswatch search "transformer architecture"       # semantic search across articles
-```
-
-### Python
-
+Chains feedkit (RSS) + markgrab (extract) + embgrep (search) + diffgrab (diff). Runs locally, no API keys.
+## Key exports
+- `NewsPipeline` — async pipeline: setup/run/search/close
+- `PipelineResult` — dataclass with counts + errors
+## Example
 ```python
 from newswatch.pipeline import NewsPipeline
-
 pipeline = NewsPipeline()
 await pipeline.setup(categories=["technology"])
-result = await pipeline.run(extract_limit=50)     # PipelineResult
-hits = pipeline.search("transformer architecture") # list[dict]
+result = await pipeline.run(extract_limit=50)
+hits = pipeline.search("transformer architecture")
 pipeline.close()
 ```
-
 ## Links
-
-- Docs: https://github.com/QuartzUnit/newswatch
-- PyPI: https://pypi.org/project/newswatch/
-- Source: https://github.com/QuartzUnit/newswatch
+- [Full API](/llms-full.txt) | [Source](https://github.com/QuartzUnit/newswatch) | [PyPI](https://pypi.org/project/newswatch/)
