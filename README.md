@@ -1,6 +1,6 @@
 # newswatch
 
-> [한국어 문서](README.ko.md)
+> [한국어 문서](README.ko.md) · [llms.txt](llms.txt)
 
 **News monitoring pipeline** — collect RSS feeds, extract full articles, search by meaning, and track page changes. Built entirely from [QuartzUnit](https://github.com/QuartzUnit) libraries.
 
