@@ -151,3 +151,8 @@ pipeline = NewsPipeline(db_dir="/path/to/data")
 ## License
 
 [MIT](LICENSE)
+
+
+---
+
+<sub>Part of the [QuartzUnit](https://github.com/QuartzUnit) ecosystem — composable Python libraries for data collection, extraction, search, and AI agent safety.</sub>

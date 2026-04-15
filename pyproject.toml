@@ -36,6 +36,9 @@ newswatch = "newswatch.__main__:main"
 [project.urls]
 Homepage = "https://github.com/QuartzUnit/newswatch"
 Repository = "https://github.com/QuartzUnit/newswatch"
+Issues = "https://github.com/QuartzUnit/newswatch/issues"
+Documentation = "https://github.com/QuartzUnit/newswatch#readme"
+Changelog = "https://github.com/QuartzUnit/newswatch/releases"
 
 [tool.ruff]
 target-version = "py311"
